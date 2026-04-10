@@ -53,7 +53,7 @@ BHt (Biblia Hebraica transcripta) is a digital transcription of the Hebrew Bible
 ┌──────────────┐  stdio  ┌──────────────────┐  cache miss  ┌─────────────┐
 │  MCP Client  │ ───────→│  bht-mcp         │ ───────────→│  BHt Website │
 │  (Claude,    │ ←───────│  (local process) │ ←───────────│  (LMU Munich)│
-│   Cursor,    │         │  ┌────────────┐  │              └─────────────┘
+│   local LLM, │         │  ┌────────────┐  │              └─────────────┘
 │   etc.)      │         │  │ ~/.bht/    │  │
 └──────────────┘         │  │ cache.db   │  │  ← local SQLite cache
                          │  └────────────┘  │
@@ -107,7 +107,7 @@ If `pip` is not recognized, try `pip3` instead.
 
 MCP (Model Context Protocol) lets AI assistants use external tools. You need to tell your AI client about bht-mcp. Choose your client below:
 
-### Claude Desktop / Claude Code
+### Claude Desktop
 
 Edit your MCP settings (Settings → Developer → MCP Servers) and add:
 
@@ -121,9 +121,25 @@ Edit your MCP settings (Settings → Developer → MCP Servers) and add:
 }
 ```
 
-### Cursor
+### Claude Code
 
-Open Settings → MCP → Add Server:
+Run in your terminal:
+
+```bash
+claude mcp add bht -- bht-mcp
+```
+
+Or manually edit `~/.claude/claude_desktop_config.json` with the JSON above.
+
+### Local LLMs (Open WebUI, llama.cpp, Ollama, etc.)
+
+If your local LLM setup supports MCP, configure it to launch `bht-mcp` as a stdio subprocess. The server command is:
+
+```bash
+bht-mcp
+```
+
+For frameworks that accept an MCP server config:
 
 ```json
 {
@@ -134,6 +150,8 @@ Open Settings → MCP → Add Server:
   }
 }
 ```
+
+> **Note:** MCP tool calling requires a model that supports function/tool calling. Most 7B+ instruction-tuned models work (Llama 3, Mistral, Qwen, etc.).
 
 ### Other MCP-compatible clients
 
@@ -324,7 +342,7 @@ BHt (Biblia Hebraica transcripta)는 뮌헨 대학교(LMU Munich)에서 Wolfgang
 ┌──────────────┐  stdio  ┌──────────────────┐  캐시 미스   ┌──────────────┐
 │  MCP 클라이언트│ ───────→│  bht-mcp         │ ──────────→│  BHt 웹사이트  │
 │  (Claude,    │ ←───────│  (로컬 프로세스)    │ ←──────────│  (LMU Munich) │
-│   Cursor 등)  │         │  ┌────────────┐  │             └──────────────┘
+│  로컬 LLM 등) │         │  ┌────────────┐  │             └──────────────┘
 └──────────────┘         │  │ ~/.bht/    │  │
                          │  │ cache.db   │  │  ← 로컬 SQLite 캐시
                          │  └────────────┘  │
@@ -378,7 +396,7 @@ bht-mcp --help
 
 MCP (Model Context Protocol)는 AI 어시스턴트가 외부 도구를 사용할 수 있게 해줍니다. AI 클라이언트에 bht-mcp를 등록해야 합니다. 아래에서 사용 중인 클라이언트를 선택하세요:
 
-#### Claude Desktop / Claude Code
+#### Claude Desktop
 
 MCP 설정을 편집합니다 (Settings → Developer → MCP Servers):
 
@@ -392,9 +410,25 @@ MCP 설정을 편집합니다 (Settings → Developer → MCP Servers):
 }
 ```
 
-#### Cursor
+#### Claude Code
 
-Settings → MCP → Add Server:
+터미널에서 실행:
+
+```bash
+claude mcp add bht -- bht-mcp
+```
+
+또는 `~/.claude/claude_desktop_config.json`에 위의 JSON을 직접 추가할 수도 있습니다.
+
+#### 로컬 LLM (Open WebUI, llama.cpp, Ollama 등)
+
+로컬 LLM 환경이 MCP를 지원하는 경우, `bht-mcp`를 stdio 서브프로세스로 실행하도록 설정하세요. 서버 명령어:
+
+```bash
+bht-mcp
+```
+
+MCP 서버 설정을 받는 프레임워크의 경우:
 
 ```json
 {
@@ -405,6 +439,8 @@ Settings → MCP → Add Server:
   }
 }
 ```
+
+> **참고:** MCP tool calling을 사용하려면 함수/도구 호출을 지원하는 모델이 필요합니다. 대부분의 7B+ instruction-tuned 모델이 동작합니다 (Llama 3, Mistral, Qwen 등).
 
 #### 기타 MCP 호환 클라이언트
 
