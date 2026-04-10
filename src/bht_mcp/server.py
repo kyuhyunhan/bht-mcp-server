@@ -95,7 +95,14 @@ mcp = FastMCP(
         "Rut=Ruth, Hl=Song of Songs, Koh=Ecclesiastes, Klgl=Lamentations, "
         "Est=Esther, Dan=Daniel, Esr=Ezra, Neh=Nehemiah, 1Chr, 2Chr, "
         "ASir-TSir=Sirach fragments.\n\n"
-        "You can use either codes (Gen) or full names (Genesis) in all tools."
+        "You can use either codes (Gen) or full names (Genesis) in all tools.\n\n"
+        "Recommended workflow:\n"
+        "1. bht_search to find tokens (returns beleg_nr for each)\n"
+        "2. bht_token_detail with beleg_nr from search results\n"
+        "3. bht_syntax_tree / bht_sentence_analysis for syntax\n\n"
+        "IMPORTANT: Always call bht_search first before bht_token_detail. "
+        "Use beleg_nr (not pos) to identify tokens — pos resets per sentence "
+        "and can be ambiguous."
     ),
     lifespan=lifespan,
 )
@@ -161,10 +168,10 @@ async def field_info(field: str, ctx: Context) -> str:
     name="bht_search",
     description=(
         "Search the BHt database for Hebrew Bible tokens matching filters. "
+        "Call this FIRST before bht_token_detail — it returns beleg_nr "
+        "values needed to identify each token for detailed analysis.\n\n"
         "Returns text-level results (token text, location, sentence context) "
-        "with a 'cached' flag indicating whether morphological detail is "
-        "already available locally. Use bht_token_detail for morphological "
-        "analysis of specific tokens.\n\n"
+        "with a 'cached' flag and beleg_nr for each token.\n\n"
         "Multiple filters are combined with AND.\n\n"
         "Pass filters as a dict: {buch: 'Gen', kapitel: '1', vers: '1'}\n\n"
         "Common filter combinations:\n"
@@ -203,10 +210,11 @@ async def search(
         "Get full morphological analysis of a single Hebrew Bible token "
         "from BHt. Returns person, gender, number, verbal stem, part of "
         "speech, root, lexeme, construction type, and more.\n\n"
-        "Two ways to identify a token:\n"
-        "  Option A: by beleg_nr (from bht_search results)\n"
-        "  Option B: by location (buch, kapitel, vers, pos)\n\n"
-        "Use bht_search to explore, then this tool for detailed analysis."
+        "Always call bht_search first to get the token list, then use "
+        "beleg_nr from search results to identify the token.\n\n"
+        "Example: bht_search({buch:'Gen',kapitel:'1',vers:'1'}) returns "
+        "tokens with beleg_nr=1..11, then call bht_token_detail(buch='Gen', "
+        "beleg_nr=3) for detailed morphology."
     ),
 )
 async def token_detail(

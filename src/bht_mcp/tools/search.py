@@ -217,7 +217,11 @@ async def bht_search(
                 r["cached"] = r["beleg_nr"] in cached_set
 
     quota = await cache.get_quota()
-    resp = ToolResponse(data=rows, quota=quota, truncated=truncated)
+    data: dict[str, Any] = {
+        "tokens": rows,
+        "hint": "Use bht_token_detail(buch, beleg_nr=N) for morphological detail of specific tokens.",
+    }
+    resp = ToolResponse(data=data, quota=quota, truncated=truncated)
     if truncated:
         resp.total_available = total
     return resp
