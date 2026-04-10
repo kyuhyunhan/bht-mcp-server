@@ -32,7 +32,8 @@ async def bht_text_annotations(
     quota = await cache.get_quota()
 
     try:
-        validate_book(buch)
+        book_info = validate_book(buch)
+        buch = book_info.code
     except ValueError as e:
         return ToolResponse(
             data=None, quota=quota,

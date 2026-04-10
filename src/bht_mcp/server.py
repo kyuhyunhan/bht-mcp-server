@@ -85,10 +85,17 @@ mcp = FastMCP(
     "bht",
     instructions=(
         "BHt (Biblia Hebraica transcripta) MCP server. "
-        "Access the Hebrew Bible linguistic database from LMU Munich. "
-        "Start with bht_list_books to see available books, "
-        "bht_field_info to discover search field values, "
-        "then bht_search to find tokens."
+        "Access the Hebrew Bible linguistic database from LMU Munich.\n\n"
+        "Book codes: Gen=Genesis, Ex=Exodus, Lev=Leviticus, Num=Numeri, "
+        "Dt=Deuteronomium, Jos=Josua, Ri=Richter, 1Sam, 2Sam, "
+        "1Koen=1 Kings, 2Koen=2 Kings, Jes=Isaiah, Jer=Jeremiah, "
+        "Ez=Ezekiel, Hos, Joel, Am=Amos, Ob=Obadiah, Jon=Jonah, "
+        "Mich=Micah, Nah, Hab=Habakkuk, Zef=Zephaniah, Hag=Haggai, "
+        "Sach=Zechariah, Mal=Malachi, Ps=Psalms, Ij=Job, Spr=Proverbs, "
+        "Rut=Ruth, Hl=Song of Songs, Koh=Ecclesiastes, Klgl=Lamentations, "
+        "Est=Esther, Dan=Daniel, Esr=Ezra, Neh=Nehemiah, 1Chr, 2Chr, "
+        "ASir-TSir=Sirach fragments.\n\n"
+        "You can use either codes (Gen) or full names (Genesis) in all tools."
     ),
     lifespan=lifespan,
 )
@@ -159,29 +166,29 @@ async def field_info(field: str, ctx: Context) -> str:
         "already available locally. Use bht_token_detail for morphological "
         "analysis of specific tokens.\n\n"
         "Multiple filters are combined with AND.\n\n"
+        "Pass filters as a dict: {buch: 'Gen', kapitel: '1', vers: '1'}\n\n"
         "Common filter combinations:\n"
         "- {buch: 'Gen', kapitel: '1', vers: '1'} → Genesis 1:1\n"
-        "- {wa: '11 VERB', stamm: 'G'} → all Qal verbs in entire Bible\n"
+        "- {buch: 'Gen', wa: '11 VERB', stamm: 'G'} → all Qal verbs in Genesis\n"
         "- {Wurzel: 'BRʾ'} → all tokens with root BRʾ (create)\n"
         "- {buch: 'Ps', wa: '12 SUBSTANTIV'} → all nouns in Psalms\n\n"
-        "Book codes: Gen,Ex,Lev,Num,Dt,Jos,Ri,1Sam,2Sam,1Koen,2Koen,"
-        "Jes,Jer,Ez,Hos,Joel,Am,Ob,Jon,Mich,Nah,Hab,Zef,Hag,Sach,Mal,"
-        "Ps,Ij,Spr,Rut,Hl,Koh,Klgl,Est,Dan,Esr,Neh,1Chr,2Chr"
+        "Book names (Genesis, Exodus, ...) are accepted as well as codes (Gen, Ex, ...)."
     ),
 )
 async def search(
-    filters: list[dict[str, str]],
+    filters: dict[str, str],
     ctx: Context,
     limit: int = 100,
 ) -> str:
     """Search for Hebrew Bible tokens matching filters.
 
     Args:
-        filters: List of {field, value} filter objects. Combined with AND.
+        filters: Filter dict. Keys are field names, values are filter values. Combined with AND.
         limit: Maximum results to return (default 100, max 1000).
     """
     state = _get_state(ctx)
-    resp = await _bht_search(state.cache, state.fetcher, filters, limit)
+    filter_list = [{"field": k, "value": str(v)} for k, v in filters.items()]
+    resp = await _bht_search(state.cache, state.fetcher, filter_list, limit)
     return json.dumps(resp.to_dict(), ensure_ascii=False)
 
 
@@ -238,24 +245,25 @@ async def token_detail(
         "Get the syntactic tree (Wortfügungsebene) for a sentence in the "
         "Hebrew Bible. Returns a JSON tree with nodes like PV (predicate "
         "phrase), NV (nominal phrase), SUB (substantive), etc.\n\n"
-        "Only requires book, chapter, verse, and sentence label. Internal "
-        "parameters (bm_nr, s_nr) are resolved automatically."
+        "Only requires book, chapter, and verse. If satz is omitted, returns "
+        "trees for ALL sentences in the verse. Internal parameters (bm_nr, "
+        "s_nr) are resolved automatically."
     ),
 )
 async def syntax_tree(
     buch: str,
     kapitel: int,
     vers: int,
-    satz: str,
     ctx: Context,
+    satz: str | None = None,
 ) -> str:
-    """Get the syntactic tree for a sentence.
+    """Get the syntactic tree for a verse or sentence.
 
     Args:
-        buch: Book code (e.g. 'Gen').
+        buch: Book code or name (e.g. 'Gen' or 'Genesis').
         kapitel: Chapter number.
         vers: Verse number.
-        satz: Sentence label ('P', 'PR', 'a', 'b', etc.).
+        satz: Sentence label ('P', 'PR', 'a', 'b'). Optional — omit to get all sentences.
     """
     state = _get_state(ctx)
     resp = await _bht_syntax_tree(
@@ -275,23 +283,24 @@ async def syntax_tree(
         "Get sentence-level syntactic analysis (Satzfügungsebene) for a "
         "sentence in the Hebrew Bible. Returns sentence type, deep structure, "
         "syntagms, relations, and clause elements. Higher-level than the "
-        "word-level syntax tree."
+        "word-level syntax tree.\n\n"
+        "If satz is omitted, returns analysis for ALL sentences in the verse."
     ),
 )
 async def sentence_analysis(
     buch: str,
     kapitel: int,
     vers: int,
-    satz: str,
     ctx: Context,
+    satz: str | None = None,
 ) -> str:
-    """Get sentence-level syntactic analysis.
+    """Get sentence-level syntactic analysis for a verse or sentence.
 
     Args:
-        buch: Book code (e.g. 'Gen').
+        buch: Book code or name (e.g. 'Gen' or 'Genesis').
         kapitel: Chapter number.
         vers: Verse number.
-        satz: Sentence label ('P', 'PR', 'a', 'b', etc.).
+        satz: Sentence label ('P', 'PR', 'a', 'b'). Optional — omit to get all sentences.
     """
     state = _get_state(ctx)
     resp = await _bht_sentence_analysis(

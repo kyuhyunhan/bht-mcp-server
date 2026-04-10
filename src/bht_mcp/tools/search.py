@@ -123,7 +123,7 @@ async def bht_field_info(
 async def bht_search(
     cache: CacheManager,
     fetcher: Fetcher,
-    filters: list[dict[str, str]],
+    filters: list[dict[str, str]] | dict[str, str],
     limit: int = DEFAULT_SEARCH_LIMIT,
 ) -> ToolResponse:
     """Search BHt database for Hebrew Bible tokens matching filters.
@@ -134,6 +134,10 @@ async def bht_search(
 
     BHt requests: 0 (cached) or 1 (cache miss).
     """
+    # Normalize dict format → list format
+    if isinstance(filters, dict):
+        filters = [{"field": k, "value": str(v)} for k, v in filters.items()]
+
     limit = max(1, min(limit, MAX_SEARCH_LIMIT))
     quota = await cache.get_quota()
 
@@ -145,11 +149,11 @@ async def bht_search(
             error=ErrorInfo(
                 code=ErrorCode.INVALID_FIELD,
                 message="At least one filter is required.",
-                suggestion="Example: [{field: 'buch', value: 'Gen'}]",
+                suggestion="Example: {buch: 'Gen', kapitel: '1', vers: '1'}",
             ),
         )
 
-    # Validate field names and book codes
+    # Validate field names and book codes (normalize book names → codes)
     for f in filters:
         field_name = f.get("field", "")
         if field_name not in VALID_FIELDS and field_name not in _POST_FILTER_FIELDS:
@@ -164,7 +168,8 @@ async def bht_search(
             )
         if field_name == "buch":
             try:
-                validate_book(f["value"])
+                book_info = validate_book(f["value"])
+                f["value"] = book_info.code  # normalize "Genesis" → "Gen"
             except ValueError as e:
                 return ToolResponse(
                     data=None,

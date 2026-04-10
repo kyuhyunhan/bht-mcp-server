@@ -39,9 +39,10 @@ async def bht_token_detail(
     """
     quota = await cache.get_quota()
 
-    # Validate book
+    # Validate and normalize book code
     try:
         book_info = validate_book(buch)
+        buch = book_info.code
     except ValueError as e:
         return ToolResponse(
             data=None,

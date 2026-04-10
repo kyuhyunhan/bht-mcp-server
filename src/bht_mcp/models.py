@@ -467,22 +467,87 @@ assert len(VALID_FIELDS) == 42, f"Expected 42 fields, got {len(VALID_FIELDS)}"
 
 
 # ---------------------------------------------------------------------------
+# Book name → code lookups (for fuzzy resolution)
+# ---------------------------------------------------------------------------
+
+# German names from BOOKS_DATA (lowercased → BookInfo)
+_NAME_TO_CODE: dict[str, BookInfo] = {
+    b.name.lower(): b for b in BOOKS_DATA.values()
+}
+
+# English names that differ from German BHt names
+_ENGLISH_ALIASES: dict[str, str] = {
+    "genesis": "Gen",
+    "exodus": "Ex",
+    "leviticus": "Lev",
+    "numbers": "Num",
+    "deuteronomy": "Dt",
+    "joshua": "Jos",
+    "judges": "Ri",
+    "1 samuel": "1Sam",
+    "2 samuel": "2Sam",
+    "1 kings": "1Koen",
+    "2 kings": "2Koen",
+    "isaiah": "Jes",
+    "jeremiah": "Jer",
+    "ezekiel": "Ez",
+    "hosea": "Hos",
+    "joel": "Joel",
+    "amos": "Am",
+    "obadiah": "Ob",
+    "jonah": "Jon",
+    "micah": "Mich",
+    "nahum": "Nah",
+    "habakkuk": "Hab",
+    "zephaniah": "Zef",
+    "haggai": "Hag",
+    "zechariah": "Sach",
+    "malachi": "Mal",
+    "psalms": "Ps",
+    "job": "Ij",
+    "proverbs": "Spr",
+    "ruth": "Rut",
+    "song of solomon": "Hl",
+    "song of songs": "Hl",
+    "ecclesiastes": "Koh",
+    "lamentations": "Klgl",
+    "esther": "Est",
+    "daniel": "Dan",
+    "ezra": "Esr",
+    "nehemiah": "Neh",
+    "1 chronicles": "1Chr",
+    "2 chronicles": "2Chr",
+}
+
+
+# ---------------------------------------------------------------------------
 # Helpers — book/field validation
 # ---------------------------------------------------------------------------
 
 
 def validate_book(code: str) -> BookInfo:
-    """Return BookInfo or raise ValueError with suggestion."""
+    """Resolve a book identifier to BookInfo.
+
+    Accepts: exact code ('Gen'), case-insensitive code ('gen'),
+    German name ('Genesis', 'Psalmen'), or English name ('Exodus', 'Psalms').
+    """
+    # 1. Exact code match
     if code in BOOKS_DATA:
         return BOOKS_DATA[code]
-    # Case-insensitive fallback
+    code_lower = code.lower()
+    # 2. Case-insensitive code match
     for key, info in BOOKS_DATA.items():
-        if key.lower() == code.lower():
-            raise ValueError(
-                f"Book code '{code}' not found. Did you mean '{key}'?"
-            )
+        if key.lower() == code_lower:
+            return info
+    # 3. German name match (from BOOKS_DATA.name)
+    if code_lower in _NAME_TO_CODE:
+        return _NAME_TO_CODE[code_lower]
+    # 4. English alias match
+    if code_lower in _ENGLISH_ALIASES:
+        return BOOKS_DATA[_ENGLISH_ALIASES[code_lower]]
+    # 5. Not found
     raise ValueError(
-        f"Book code '{code}' not found. Use bht_list_books to see all valid codes."
+        f"Book '{code}' not found. Use bht_list_books to see all valid codes."
     )
 
 

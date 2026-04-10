@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import re
+from dataclasses import asdict
 from typing import Any
 
 from bs4 import BeautifulSoup
@@ -29,6 +30,20 @@ from bht_mcp.parser import parse_beleg
 
 
 # ---------------------------------------------------------------------------
+# Shared helpers
+# ---------------------------------------------------------------------------
+
+
+async def _discover_satz_labels(
+    cache: CacheManager, fetcher: Fetcher, buch: str, kapitel: int, vers: int
+) -> list[str]:
+    """Return sorted unique satz labels for a verse. HTTP 0 if book is cached."""
+    await _ensure_book_tokens(cache, fetcher, buch)
+    tokens = await cache.get_tokens(buch, kapitel=kapitel, vers=vers)
+    return sorted(set(t["satz"] for t in tokens if t.get("satz")))
+
+
+# ---------------------------------------------------------------------------
 # Tool 5: bht_syntax_tree
 # ---------------------------------------------------------------------------
 
@@ -39,21 +54,51 @@ async def bht_syntax_tree(
     buch: str,
     kapitel: int,
     vers: int,
-    satz: str,
+    satz: str | None = None,
 ) -> ToolResponse:
-    """Get the syntactic tree (Wortfügungsebene) for a sentence."""
-    quota = await cache.get_quota()
+    """Get the syntactic tree (Wortfügungsebene) for a sentence.
 
+    If satz is omitted, returns trees for ALL sentences in the verse.
+    """
     try:
-        validate_book(buch)
+        book_info = validate_book(buch)
     except ValueError as e:
         return ToolResponse(
-            data=None, quota=quota,
+            data=None, quota=await cache.get_quota(),
             error=ErrorInfo(code=ErrorCode.INVALID_BOOK, message=str(e),
                             suggestion="Use bht_list_books to see all valid book codes."),
         )
+    buch = book_info.code
 
-    # Resolve bm_nr, s_nr, b_nr — tree requires bm_nr > 0
+    if satz is not None:
+        return await _syntax_tree_single(cache, fetcher, buch, kapitel, vers, satz)
+
+    # satz omitted → discover all satz labels and return all trees
+    labels = await _discover_satz_labels(cache, fetcher, buch, kapitel, vers)
+    if not labels:
+        return ToolResponse(
+            data=None, quota=await cache.get_quota(),
+            error=ErrorInfo(code=ErrorCode.INVALID_FIELD,
+                            message=f"No tokens found for {buch} {kapitel}:{vers}.",
+                            suggestion="Check chapter and verse numbers."),
+        )
+
+    results = []
+    for s in labels:
+        resp = await _syntax_tree_single(cache, fetcher, buch, kapitel, vers, s)
+        results.append({"satz": s, "data": resp.data, "error": asdict(resp.error) if resp.error else None})
+
+    return ToolResponse(
+        data={"verse": f"{buch} {kapitel}:{vers}", "satz_labels": labels, "results": results},
+        quota=await cache.get_quota(),
+    )
+
+
+async def _syntax_tree_single(
+    cache: CacheManager, fetcher: Fetcher,
+    buch: str, kapitel: int, vers: int, satz: str,
+) -> ToolResponse:
+    """Fetch a single syntax tree for one satz. Core logic."""
     try:
         nav = await _resolve_navigation(
             cache, fetcher, buch, kapitel, vers, satz, require_tree=True
@@ -65,34 +110,26 @@ async def bht_syntax_tree(
 
     bm_nr, s_nr, b_nr = nav["bm_nr"], nav["s_nr"], nav["b_nr"]
 
-    # Check tree cache
     cached_json = await cache.get_tree(buch, kapitel, vers, satz, s_nr)
     if cached_json is not None:
         return ToolResponse(data=json.loads(cached_json), quota=await cache.get_quota())
 
-    # Fetch tree HTML
     try:
-        html = await fetcher.fetch_tree_html(
-            buch, kapitel, b_nr, bm_nr, vers, satz, s_nr
-        )
+        html = await fetcher.fetch_tree_html(buch, kapitel, b_nr, bm_nr, vers, satz, s_nr)
     except DailyLimitExceeded as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
     except BhtUnavailable as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
 
-    # Parse inline JSON from tree page
     tree_data = _parse_tree_json(html)
     if tree_data is None:
         return ToolResponse(
             data=None, quota=await cache.get_quota(),
-            error=ErrorInfo(
-                code=ErrorCode.PARSE_ERROR,
-                message="Could not extract syntax tree from page.",
-                suggestion="BHt website structure may have changed.",
-            ),
+            error=ErrorInfo(code=ErrorCode.PARSE_ERROR,
+                            message=f"Could not extract syntax tree for satz='{satz}'.",
+                            suggestion="BHt website structure may have changed."),
         )
 
-    # Cache and return
     tree_json = json.dumps(tree_data, ensure_ascii=False)
     await cache.set_tree(buch, kapitel, vers, satz, s_nr, bm_nr, b_nr, tree_json)
     return ToolResponse(data=tree_data, quota=await cache.get_quota())
@@ -109,21 +146,50 @@ async def bht_sentence_analysis(
     buch: str,
     kapitel: int,
     vers: int,
-    satz: str,
+    satz: str | None = None,
 ) -> ToolResponse:
-    """Get sentence-level syntactic analysis (Satzfügungsebene)."""
-    quota = await cache.get_quota()
+    """Get sentence-level syntactic analysis (Satzfügungsebene).
 
+    If satz is omitted, returns analysis for ALL sentences in the verse.
+    """
     try:
-        validate_book(buch)
+        book_info = validate_book(buch)
     except ValueError as e:
         return ToolResponse(
-            data=None, quota=quota,
+            data=None, quota=await cache.get_quota(),
             error=ErrorInfo(code=ErrorCode.INVALID_BOOK, message=str(e),
                             suggestion="Use bht_list_books to see all valid book codes."),
         )
+    buch = book_info.code
 
-    # Resolve navigation params
+    if satz is not None:
+        return await _sentence_analysis_single(cache, fetcher, buch, kapitel, vers, satz)
+
+    labels = await _discover_satz_labels(cache, fetcher, buch, kapitel, vers)
+    if not labels:
+        return ToolResponse(
+            data=None, quota=await cache.get_quota(),
+            error=ErrorInfo(code=ErrorCode.INVALID_FIELD,
+                            message=f"No tokens found for {buch} {kapitel}:{vers}.",
+                            suggestion="Check chapter and verse numbers."),
+        )
+
+    results = []
+    for s in labels:
+        resp = await _sentence_analysis_single(cache, fetcher, buch, kapitel, vers, s)
+        results.append({"satz": s, "data": resp.data, "error": asdict(resp.error) if resp.error else None})
+
+    return ToolResponse(
+        data={"verse": f"{buch} {kapitel}:{vers}", "satz_labels": labels, "results": results},
+        quota=await cache.get_quota(),
+    )
+
+
+async def _sentence_analysis_single(
+    cache: CacheManager, fetcher: Fetcher,
+    buch: str, kapitel: int, vers: int, satz: str,
+) -> ToolResponse:
+    """Fetch a single sentence analysis for one satz. Core logic."""
     try:
         nav = await _resolve_navigation(cache, fetcher, buch, kapitel, vers, satz)
     except _ResolutionError as e:
@@ -133,34 +199,26 @@ async def bht_sentence_analysis(
 
     bm_nr, s_nr, b_nr = nav["bm_nr"], nav["s_nr"], nav["b_nr"]
 
-    # Check sentence cache
     cached_json = await cache.get_sentence(buch, kapitel, vers, satz, s_nr)
     if cached_json is not None:
         return ToolResponse(data=json.loads(cached_json), quota=await cache.get_quota())
 
-    # Fetch sentence HTML
     try:
-        html = await fetcher.fetch_sentence_html(
-            buch, kapitel, b_nr, bm_nr, vers, satz, s_nr
-        )
+        html = await fetcher.fetch_sentence_html(buch, kapitel, b_nr, bm_nr, vers, satz, s_nr)
     except DailyLimitExceeded as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
     except BhtUnavailable as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
 
-    # Parse sentence analysis from HTML table
     analysis = _parse_sentence_html(html)
     if analysis is None:
         return ToolResponse(
             data=None, quota=await cache.get_quota(),
-            error=ErrorInfo(
-                code=ErrorCode.PARSE_ERROR,
-                message="Could not parse sentence analysis page.",
-                suggestion="BHt website structure may have changed.",
-            ),
+            error=ErrorInfo(code=ErrorCode.PARSE_ERROR,
+                            message=f"Could not parse sentence analysis for satz='{satz}'.",
+                            suggestion="BHt website structure may have changed."),
         )
 
-    # Cache and return
     analysis_json = json.dumps(analysis, ensure_ascii=False)
     await cache.set_sentence(buch, kapitel, vers, satz, s_nr, bm_nr, analysis_json)
     return ToolResponse(data=analysis, quota=await cache.get_quota())
