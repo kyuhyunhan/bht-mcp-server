@@ -18,6 +18,7 @@ from bs4 import BeautifulSoup
 
 from bht_mcp.cache import CacheManager
 from bht_mcp.fetcher import BhtUnavailable, DailyLimitExceeded, Fetcher
+from bht_mcp.tools.search import ensure_book_tokens as _ensure_book_tokens
 from bht_mcp.models import (
     ErrorCode,
     ErrorInfo,
@@ -193,12 +194,7 @@ async def _resolve_navigation(
     Some tokens (e.g. verbs) have bm_nr=0 and no tree data.
     """
     # Ensure book tokens are cached
-    if not await cache.has_book_tokens(buch):
-        raw = await fetcher.flex_search([{"field": "buch", "value": buch}])
-        from bht_mcp.tools.search import _normalize_api_row
-
-        rows = [_normalize_api_row(r) for r in raw]
-        await cache.set_book_tokens(buch, rows)
+    await _ensure_book_tokens(cache, fetcher, buch)
 
     # Find tokens in this sentence
     tokens = await cache.get_tokens(buch, kapitel=kapitel, vers=vers)
@@ -210,18 +206,23 @@ async def _resolve_navigation(
             suggestion="Use bht_search to find valid satz labels for this verse.",
         ))
 
-    # Try each token until we find valid navigation params
+    # Phase 1: Check already-cached belegs first (0 HTTP requests).
+    # This avoids fetching belegs just to discover bm_nr=0 when a
+    # cached beleg with bm_nr>0 already exists further in the list.
+    uncached_targets: list[dict] = []
     for target in matching:
         b_nr = target["beleg_nr"]
-
-        # Check if beleg is already cached
         beleg = await cache.get_beleg(buch, b_nr)
         if beleg is not None and beleg.get("bm_nr") is not None:
             if require_tree and beleg["bm_nr"] == 0:
-                continue  # this token has no tree link, try next
+                continue
             return {"bm_nr": beleg["bm_nr"], "s_nr": beleg["s_nr"], "b_nr": b_nr}
+        else:
+            uncached_targets.append(target)
 
-        # Fetch beleg to get navigation params
+    # Phase 2: No cached beleg had valid nav params. Fetch uncached ones.
+    for target in uncached_targets:
+        b_nr = target["beleg_nr"]
         html = await fetcher.fetch_beleg_html(buch, kapitel, b_nr)
         parsed = parse_beleg(html)
         await cache.set_beleg(parsed)
@@ -230,7 +231,7 @@ async def _resolve_navigation(
             continue
 
         if require_tree and parsed["bm_nr"] == 0:
-            continue  # no tree for this token, try next
+            continue
 
         return {"bm_nr": parsed["bm_nr"], "s_nr": parsed["s_nr"], "b_nr": b_nr}
 

@@ -369,6 +369,17 @@ class CacheManager:
         rows = await cursor.fetchall()
         return [dict(row) for row in rows]
 
+    async def get_token_by_beleg_nr(
+        self, buch: str, beleg_nr: int
+    ) -> dict[str, Any] | None:
+        """Look up a single token by beleg_nr. O(1) via primary key."""
+        cursor = await self.db.execute(
+            "SELECT * FROM tokens WHERE buch = ? AND beleg_nr = ?",
+            (buch, beleg_nr),
+        )
+        row = await cursor.fetchone()
+        return dict(row) if row else None
+
     async def set_book_tokens(self, buch: str, rows: list[dict[str, Any]]) -> None:
         """Bulk insert tokens for a book (replaces existing)."""
         await self.db.execute("DELETE FROM tokens WHERE buch = ?", (buch,))

@@ -194,7 +194,13 @@ async def bht_search(
     except BhtUnavailable as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
 
-    # Add cached flag
+    # Apply limit and truncation before cached flag check —
+    # no need to query beleg_cache for rows that will be discarded.
+    total = len(rows)
+    truncated = total > limit
+    rows = rows[:limit]
+
+    # Add cached flag (only on the returned rows)
     if rows:
         buch_groups: dict[str, list[dict]] = {}
         for row in rows:
@@ -204,11 +210,6 @@ async def bht_search(
             cached_set = await cache.is_beleg_cached_bulk(buch, beleg_nrs)
             for r in group:
                 r["cached"] = r["beleg_nr"] in cached_set
-
-    # Apply limit and truncation
-    total = len(rows)
-    truncated = total > limit
-    rows = rows[:limit]
 
     quota = await cache.get_quota()
     resp = ToolResponse(data=rows, quota=quota, truncated=truncated)
@@ -222,6 +223,19 @@ async def bht_search(
 # ---------------------------------------------------------------------------
 
 
+async def ensure_book_tokens(cache: CacheManager, fetcher: Fetcher, buch: str) -> None:
+    """Ensure all tokens for a book are in the tokens table.
+
+    If not cached, fetches via flex_search API (1 JSON request, no daily limit).
+    Called from search, detail, and syntax modules.
+    """
+    if await cache.has_book_tokens(buch):
+        return
+    raw = await fetcher.flex_search([{"field": "buch", "value": buch}])
+    rows = [_normalize_api_row(r) for r in raw]
+    await cache.set_book_tokens(buch, rows)
+
+
 async def _search_via_tokens_table(
     cache: CacheManager,
     fetcher: Fetcher,
@@ -230,13 +244,7 @@ async def _search_via_tokens_table(
 ) -> list[dict[str, Any]]:
     """Location-only search: tokens table with local filtering."""
     buch = search_fields["buch"]
-
-    # Ensure book is cached
-    if not await cache.has_book_tokens(buch):
-        # Fetch all tokens for this book via flex_search API
-        raw = await fetcher.flex_search([{"field": "buch", "value": buch}])
-        rows = [_normalize_api_row(r) for r in raw]
-        await cache.set_book_tokens(buch, rows)
+    await ensure_book_tokens(cache, fetcher, buch)
 
     # Query tokens table with location filters
     kapitel = _int_or_none(post_filters.get("kapitel"))

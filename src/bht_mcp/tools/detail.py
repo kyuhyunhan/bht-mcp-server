@@ -13,6 +13,7 @@ from typing import Any
 
 from bht_mcp.cache import CacheManager
 from bht_mcp.fetcher import BhtUnavailable, DailyLimitExceeded, Fetcher
+from bht_mcp.tools.search import ensure_book_tokens as _ensure_book_tokens
 from bht_mcp.models import (
     ErrorCode,
     ErrorInfo,
@@ -160,16 +161,10 @@ async def _resolve_beleg_nr(
 
     Ensures book tokens are cached first (may trigger 1 flex_search API call).
     """
-    # Ensure book is in tokens table
-    if not await cache.has_book_tokens(buch):
-        try:
-            raw = await fetcher.flex_search([{"field": "buch", "value": buch}])
-            from bht_mcp.tools.search import _normalize_api_row
-
-            rows = [_normalize_api_row(r) for r in raw]
-            await cache.set_book_tokens(buch, rows)
-        except BhtUnavailable:
-            return None
+    try:
+        await _ensure_book_tokens(cache, fetcher, buch)
+    except BhtUnavailable:
+        return None
 
     # Query tokens table
     tokens = await cache.get_tokens(buch, kapitel=kapitel, vers=vers)
@@ -186,21 +181,9 @@ async def _resolve_kapitel(
     beleg_nr: int,
 ) -> int | None:
     """Look up kapitel for a beleg_nr from the tokens table."""
-    if not await cache.has_book_tokens(buch):
-        try:
-            raw = await fetcher.flex_search([{"field": "buch", "value": buch}])
-            from bht_mcp.tools.search import _normalize_api_row
-
-            rows = [_normalize_api_row(r) for r in raw]
-            await cache.set_book_tokens(buch, rows)
-        except BhtUnavailable:
-            return None
-
-    tokens = await cache.get_tokens(buch)
-    for t in tokens:
-        if t.get("beleg_nr") == beleg_nr:
-            return t.get("kapitel")
-    return None
+    await _ensure_book_tokens(cache, fetcher, buch)
+    token = await cache.get_token_by_beleg_nr(buch, beleg_nr)
+    return token.get("kapitel") if token else None
 
 
 # ---------------------------------------------------------------------------
