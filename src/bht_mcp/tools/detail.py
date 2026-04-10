@@ -1,8 +1,7 @@
 """BHt MCP Tools — bht_token_detail.
 
-Two access patterns:
-  Option A: by beleg_nr (direct, from bht_search results)
-  Option B: by location (buch, kapitel, vers, pos) → resolve via tokens table
+Retrieves full morphological analysis by beleg_nr from bht_search results.
+Always call bht_search first to discover tokens and their beleg_nr values.
 
 Source: beleg_cache (Tier 2). Cache miss triggers 1 HTML fetch + parse.
 """
@@ -27,15 +26,11 @@ async def bht_token_detail(
     cache: CacheManager,
     fetcher: Fetcher,
     buch: str,
-    beleg_nr: int | None = None,
-    kapitel: int | None = None,
-    vers: int | None = None,
-    pos: int | None = None,
+    beleg_nr: int,
 ) -> ToolResponse:
     """Get full morphological analysis of a single Hebrew Bible token.
 
-    Option A: buch + beleg_nr
-    Option B: buch + kapitel + vers + pos (resolved via tokens table)
+    beleg_nr comes from bht_search results. Always call bht_search first.
     """
     quota = await cache.get_quota()
 
@@ -54,72 +49,29 @@ async def bht_token_detail(
             ),
         )
 
-    # Resolve beleg_nr
-    if beleg_nr is not None:
-        # Option A: direct
-        resolved_nr = beleg_nr
-        resolved_kapitel = kapitel  # may be None, that's ok
-    elif kapitel is not None and vers is not None and pos is not None:
-        # Option B: resolve via tokens table
-        resolved_nr = await _resolve_beleg_nr(
-            cache, fetcher, buch, kapitel, vers, pos
-        )
-        if resolved_nr is None:
-            return ToolResponse(
-                data=None,
-                quota=await cache.get_quota(),
-                error=ErrorInfo(
-                    code=ErrorCode.INVALID_BOOK,
-                    message=(
-                        f"No token found at {buch} {kapitel}:{vers} pos={pos}."
-                    ),
-                    suggestion=(
-                        "Use bht_search to find valid positions. "
-                        "The 'pos' value comes from search results."
-                    ),
-                ),
-            )
-        resolved_kapitel = kapitel
-    else:
-        return ToolResponse(
-            data=None,
-            quota=quota,
-            error=ErrorInfo(
-                code=ErrorCode.INVALID_FIELD,
-                message="Provide either beleg_nr or (kapitel + vers + pos).",
-                suggestion=(
-                    "Option A: bht_token_detail(buch='Gen', beleg_nr=3)\n"
-                    "Option B: bht_token_detail(buch='Gen', kapitel=1, vers=1, pos=1)"
-                ),
-            ),
-        )
-
     # Check beleg cache
-    cached = await cache.get_beleg(buch, resolved_nr)
+    cached = await cache.get_beleg(buch, beleg_nr)
     if cached is not None:
         await cache.log_request(
-            endpoint="beleg", params=f"book={buch},b_nr={resolved_nr}", cached=True
+            endpoint="beleg", params=f"book={buch},b_nr={beleg_nr}", cached=True
         )
         return ToolResponse(data=_format_detail(cached), quota=await cache.get_quota())
 
-    # Cache miss — fetch beleg HTML
-    # Need kapitel for the URL; try to get it from tokens table if not provided
-    if resolved_kapitel is None:
-        resolved_kapitel = await _resolve_kapitel(cache, fetcher, buch, resolved_nr)
-
-    if resolved_kapitel is None:
+    # Cache miss — need kapitel for the beleg URL
+    kapitel = await _resolve_kapitel(cache, fetcher, buch, beleg_nr)
+    if kapitel is None:
         return ToolResponse(
             data=None,
             quota=await cache.get_quota(),
             error=ErrorInfo(
                 code=ErrorCode.INVALID_FIELD,
-                message=f"Cannot determine chapter for beleg_nr={resolved_nr}.",
-                suggestion="Provide kapitel parameter or use bht_search first.",
+                message=f"beleg_nr={beleg_nr} not found in {buch}.",
+                suggestion="Use bht_search to get valid beleg_nr values.",
             ),
         )
 
     try:
-        html = await fetcher.fetch_beleg_html(buch, resolved_kapitel, resolved_nr)
+        html = await fetcher.fetch_beleg_html(buch, kapitel, beleg_nr)
     except DailyLimitExceeded as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
     except BhtUnavailable as e:
@@ -146,33 +98,8 @@ async def bht_token_detail(
 
 
 # ---------------------------------------------------------------------------
-# Resolution helpers
+# Helpers
 # ---------------------------------------------------------------------------
-
-
-async def _resolve_beleg_nr(
-    cache: CacheManager,
-    fetcher: Fetcher,
-    buch: str,
-    kapitel: int,
-    vers: int,
-    pos: int,
-) -> int | None:
-    """Resolve (buch, kapitel, vers, pos) → beleg_nr via tokens table.
-
-    Ensures book tokens are cached first (may trigger 1 flex_search API call).
-    """
-    try:
-        await _ensure_book_tokens(cache, fetcher, buch)
-    except BhtUnavailable:
-        return None
-
-    # Query tokens table
-    tokens = await cache.get_tokens(buch, kapitel=kapitel, vers=vers)
-    for t in tokens:
-        if t.get("pos") == pos:
-            return t["beleg_nr"]
-    return None
 
 
 async def _resolve_kapitel(
@@ -182,7 +109,10 @@ async def _resolve_kapitel(
     beleg_nr: int,
 ) -> int | None:
     """Look up kapitel for a beleg_nr from the tokens table."""
-    await _ensure_book_tokens(cache, fetcher, buch)
+    try:
+        await _ensure_book_tokens(cache, fetcher, buch)
+    except BhtUnavailable:
+        return None
     token = await cache.get_token_by_beleg_nr(buch, beleg_nr)
     return token.get("kapitel") if token else None
 

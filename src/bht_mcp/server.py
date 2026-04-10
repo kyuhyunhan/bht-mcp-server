@@ -219,25 +219,18 @@ async def search(
 )
 async def token_detail(
     buch: str,
+    beleg_nr: int,
     ctx: Context,
-    beleg_nr: int | None = None,
-    kapitel: int | None = None,
-    vers: int | None = None,
-    pos: int | None = None,
 ) -> str:
     """Get full morphological analysis of a single token.
 
     Args:
-        buch: Book code (e.g. 'Gen'). Required.
-        beleg_nr: Token ID from bht_search results (Option A).
-        kapitel: Chapter number (Option B).
-        vers: Verse number (Option B).
-        pos: Position within verse, 1-based (Option B).
+        buch: Book code or name (e.g. 'Gen' or 'Genesis').
+        beleg_nr: Token ID from bht_search results.
     """
     state = _get_state(ctx)
     resp = await _bht_token_detail(
-        state.cache, state.fetcher, buch,
-        beleg_nr=beleg_nr, kapitel=kapitel, vers=vers, pos=pos,
+        state.cache, state.fetcher, buch, beleg_nr,
     )
     return json.dumps(resp.to_dict(), ensure_ascii=False)
 
