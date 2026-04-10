@@ -8,6 +8,37 @@ Manages all 11 cache tables across 4 tiers:
 - Operations: request_log, request_history
 
 All methods are async (aiosqlite). Cache is stored at ~/.bht/cache.db by default.
+
+Cache Key Strategy
+------------------
+Each table has a distinct key and lookup pattern:
+
+  Table              | Key                                   | Lookup
+  -------------------|---------------------------------------|-------------------------------
+  field_values_cache | (field, value)                        | by field name
+  tokens             | (buch, beleg_nr)                      | by buch + optional kapitel/vers
+  search_cache       | query_hash (SHA256 of sorted filters) | by hash of filter combination
+  beleg_cache        | (buch, beleg_nr)                      | by buch + beleg_nr
+  tree_cache         | (buch, kapitel, vers, satz, s_nr)     | full 5-tuple
+  sentence_cache     | (buch, kapitel, vers, satz, s_nr)     | full 5-tuple
+  text_anm_cache     | (buch, kapitel)                       | by buch + kapitel
+
+Key design decisions:
+- search_cache hash: filters are sorted by field name before hashing, so
+  [{wa, 11 VERB}, {buch, Gen}] and [{buch, Gen}, {wa, 11 VERB}] produce
+  the same hash. kapitel/vers are excluded from the hash (applied as local
+  post-filters on the cached result).
+- tokens vs search_cache: these are complementary, not redundant. tokens
+  stores ALL tokens for a book (10 fields from flex_search API, no morphology
+  columns). search_cache stores query-specific results for morphological
+  filters that cannot be replicated locally. A location-only search hits
+  tokens; a morphological search hits search_cache.
+- beleg_cache vs tokens: beleg_cache has 50+ morphological fields parsed
+  from HTML. tokens has only the 10 API response fields. Same beleg_nr may
+  appear in both — they are complementary tiers, not duplicates.
+- Atomicity: set_book_tokens() does DELETE + INSERT + COMMIT in one
+  transaction. If the process crashes mid-write, SQLite rolls back — no
+  partial state.
 """
 
 from __future__ import annotations
