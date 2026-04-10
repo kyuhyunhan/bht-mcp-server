@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "bht-mcp"
-version = "0.1.2"
+version = "0.1.3"
 description = "MCP server for the BHt (Biblia Hebraica transcripta) Hebrew Bible database"
 readme = "README.md"
 license = "MIT"
