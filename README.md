@@ -65,9 +65,9 @@ BHt (Biblia Hebraica transcripta) is a digital transcription of the Hebrew Bible
 
 ### Option A: Using uv (recommended)
 
-[uv](https://docs.astral.sh/uv/) is the standard tool for running MCP servers. No separate install step needed — just configure your client.
+With [uv](https://docs.astral.sh/uv/), you don't install bht-mcp yourself. Your MCP client runs `uvx bht-mcp`, and uvx automatically downloads it from PyPI, creates an isolated environment, and launches the server — all at runtime.
 
-**Install uv** (one-time):
+**You only need to install uv itself** (one-time):
 
 | Platform | Command |
 |----------|---------|
@@ -79,7 +79,7 @@ Then go directly to [Setting Up Your MCP Client](#setting-up-your-mcp-client) be
 
 ### Option B: Using pip
 
-If you prefer a traditional install:
+Install bht-mcp manually, then point your MCP client to it:
 
 ```bash
 pip install bht-mcp
@@ -401,9 +401,9 @@ BHt (Biblia Hebraica transcripta)는 뮌헨 대학교(LMU Munich)에서 Wolfgang
 
 #### 방법 A: uv 사용 (권장)
 
-[uv](https://docs.astral.sh/uv/)는 MCP 서버 실행의 표준 도구입니다. 별도 설치 단계 없이 클라이언트 설정만 하면 됩니다.
+[uv](https://docs.astral.sh/uv/)를 사용하면 bht-mcp를 직접 설치할 필요가 없습니다. MCP 클라이언트가 `uvx bht-mcp`를 실행하면, uvx가 자동으로 PyPI에서 다운로드하고 격리된 환경을 생성하여 서버를 시작합니다.
 
-**uv 설치** (최초 1회):
+**uv만 설치하면 됩니다** (최초 1회):
 
 | 플랫폼 | 방법 |
 |--------|------|
@@ -415,7 +415,7 @@ BHt (Biblia Hebraica transcripta)는 뮌헨 대학교(LMU Munich)에서 Wolfgang
 
 #### 방법 B: pip 사용
 
-전통적인 방식을 선호하는 경우:
+bht-mcp를 직접 설치한 후 MCP 클라이언트에서 지정하는 방식:
 
 ```bash
 pip install bht-mcp
