@@ -77,12 +77,26 @@ With [uv](https://docs.astral.sh/uv/), you don't install bht-mcp yourself. Your 
 
 Then go directly to [Setting Up Your MCP Client](#setting-up-your-mcp-client) below.
 
+**Updating (uv):** uvx caches packages locally. To get the latest version:
+
+```bash
+uv cache clean bht-mcp
+```
+
+Then restart your MCP client.
+
 ### Option B: Using pip
 
 Install bht-mcp manually, then point your MCP client to it:
 
 ```bash
 pip install bht-mcp
+```
+
+**Updating (pip):**
+
+```bash
+pip install --upgrade bht-mcp
 ```
 
 > **Requires Python 3.11+.** If Python is not installed: [python.org/downloads](https://www.python.org/downloads/) (Windows: check "Add Python to PATH"). macOS: `brew install python`. Linux: `sudo apt install python3 python3-pip`.
@@ -413,12 +427,26 @@ BHt (Biblia Hebraica transcripta)는 뮌헨 대학교(LMU Munich)에서 Wolfgang
 
 설치 후 아래 [MCP 클라이언트 설정](#mcp-클라이언트-설정)으로 바로 진행하세요.
 
+**업데이트 (uv):** uvx는 패키지를 로컬에 캐시합니다. 최신 버전을 받으려면:
+
+```bash
+uv cache clean bht-mcp
+```
+
+이후 MCP 클라이언트를 재시작하세요.
+
 #### 방법 B: pip 사용
 
 bht-mcp를 직접 설치한 후 MCP 클라이언트에서 지정하는 방식:
 
 ```bash
 pip install bht-mcp
+```
+
+**업데이트 (pip):**
+
+```bash
+pip install --upgrade bht-mcp
 ```
 
 > **Python 3.11 이상 필요.** Python이 없는 경우: [python.org/downloads](https://www.python.org/downloads/) (Windows: "Add Python to PATH" 체크). macOS: `brew install python`. Linux: `sudo apt install python3 python3-pip`.
