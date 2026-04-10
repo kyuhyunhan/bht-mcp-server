@@ -11,8 +11,6 @@ AI:   [calls bht_search with Wurzel filter for each book, then bht_token_detail
        and syntactic contexts from both books]
 ```
 
-No Hebrew expertise is needed to get started. The AI reads the linguistic data and explains it to you.
-
 [🇰🇷 한국어](#-한국어)
 
 ---
@@ -364,8 +362,6 @@ AI:    [각 책에서 어근 필터로 bht_search를 호출하고, 선택된 토
         bht_token_detail을 호출 — 두 책의 형태론 분석, 동사 어간,
         통사적 맥락을 반환합니다]
 ```
-
-히브리어 전문 지식 없이도 시작할 수 있습니다. AI가 언어학 데이터를 읽고 설명해줍니다.
 
 ---
 
