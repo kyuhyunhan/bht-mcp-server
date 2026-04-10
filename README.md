@@ -34,7 +34,7 @@ BHt (Biblia Hebraica transcripta) is a digital transcription of the Hebrew Bible
 
 - [About BHt](#about-bht)
 - [How It Works](#how-it-works)
-- [Installation](#installation)
+- [Installation & Setup](#installation--setup)
 - [Setting Up Your MCP Client](#setting-up-your-mcp-client)
 - [Research Scenarios](#research-scenarios)
   - [Getting Started](#getting-started)
@@ -66,56 +66,61 @@ BHt (Biblia Hebraica transcripta) is a digital transcription of the Hebrew Bible
 
 ---
 
-## Installation
+## Installation & Setup
 
-### 1. Install Python (skip if already installed)
+### Option A: Using uv (recommended)
 
-Check first:
+[uv](https://docs.astral.sh/uv/) is the standard tool for running MCP servers. No separate install step needed — just configure your client.
 
-```bash
-python3 --version
-```
-
-If you see `Python 3.11` or higher, skip to step 2.
-
-**If Python is not installed:**
+**Install uv** (one-time):
 
 | Platform | Command |
 |----------|---------|
-| **macOS** | `brew install python` (requires [Homebrew](https://brew.sh/)) |
-| **macOS (no Homebrew)** | Download from [python.org/downloads](https://www.python.org/downloads/) |
-| **Windows** | Download from [python.org/downloads](https://www.python.org/downloads/). Check "Add Python to PATH" during install. |
-| **Linux (Debian/Ubuntu)** | `sudo apt install python3 python3-pip` |
+| **macOS** | `brew install uv` |
+| **Windows** | `powershell -c "irm https://astral.sh/uv/install.ps1 \| iex"` |
+| **Linux** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 
-### 2. Install bht-mcp
+Then go directly to [Setting Up Your MCP Client](#setting-up-your-mcp-client) below.
+
+### Option B: Using pip
+
+If you prefer a traditional install:
 
 ```bash
 pip install bht-mcp
 ```
 
-Verify:
-
-```bash
-bht-mcp --help
-```
-
-If `pip` is not recognized, try `pip3` instead.
+> **Requires Python 3.11+.** If Python is not installed: [python.org/downloads](https://www.python.org/downloads/) (Windows: check "Add Python to PATH"). macOS: `brew install python`. Linux: `sudo apt install python3 python3-pip`.
 
 ---
 
 ## Setting Up Your MCP Client
 
-MCP (Model Context Protocol) lets AI assistants use external tools. You need to tell your AI client about bht-mcp. Choose your client below:
+MCP (Model Context Protocol) lets AI assistants use external tools. Choose your client below:
 
 ### Claude Desktop
 
 Edit your MCP settings (Settings → Developer → MCP Servers) and add:
 
+**If you installed with uv:**
 ```json
 {
   "mcpServers": {
     "bht": {
-      "command": "bht-mcp"
+      "command": "uvx",
+      "args": ["bht-mcp"]
+    }
+  }
+}
+```
+
+**If you installed with pip:**
+```json
+{
+  "mcpServers": {
+    "bht": {
+      "command": "python",
+      "args": ["-m", "bht_mcp"]
     }
   }
 }
@@ -123,29 +128,39 @@ Edit your MCP settings (Settings → Developer → MCP Servers) and add:
 
 ### Claude Code
 
-Run in your terminal:
-
 ```bash
-claude mcp add bht -- bht-mcp
+claude mcp add bht -- uvx bht-mcp
 ```
 
-Or manually edit `~/.claude/claude_desktop_config.json` with the JSON above.
+Or with pip:
+
+```bash
+claude mcp add bht -- python -m bht_mcp
+```
 
 ### Local LLMs (Open WebUI, llama.cpp, Ollama, etc.)
 
-If your local LLM setup supports MCP, configure it to launch `bht-mcp` as a stdio subprocess. The server command is:
+If your local LLM setup supports MCP, configure it to launch bht-mcp as a stdio subprocess:
 
-```bash
-bht-mcp
-```
-
-For frameworks that accept an MCP server config:
-
+**With uv:**
 ```json
 {
   "mcpServers": {
     "bht": {
-      "command": "bht-mcp"
+      "command": "uvx",
+      "args": ["bht-mcp"]
+    }
+  }
+}
+```
+
+**With pip:**
+```json
+{
+  "mcpServers": {
+    "bht": {
+      "command": "python",
+      "args": ["-m", "bht_mcp"]
     }
   }
 }
@@ -155,7 +170,7 @@ For frameworks that accept an MCP server config:
 
 ### Other MCP-compatible clients
 
-Any client that supports MCP stdio transport can use bht-mcp. The server command is simply `bht-mcp`.
+Any client that supports MCP stdio transport can use bht-mcp. Use `uvx bht-mcp` or `python -m bht_mcp` as the server command.
 
 After adding, restart your client. You should see 7 BHt tools available.
 
@@ -355,56 +370,61 @@ BHt (Biblia Hebraica transcripta)는 뮌헨 대학교(LMU Munich)에서 Wolfgang
 
 ---
 
-### 설치
+### 설치 및 설정
 
-#### 1. Python 설치 (이미 설치된 경우 건너뛰기)
+#### 방법 A: uv 사용 (권장)
 
-먼저 확인:
+[uv](https://docs.astral.sh/uv/)는 MCP 서버 실행의 표준 도구입니다. 별도 설치 단계 없이 클라이언트 설정만 하면 됩니다.
 
-```bash
-python3 --version
-```
-
-`Python 3.11` 이상이면 2단계로 건너뛰세요.
-
-**Python이 설치되어 있지 않은 경우:**
+**uv 설치** (최초 1회):
 
 | 플랫폼 | 방법 |
 |--------|------|
-| **macOS** | `brew install python` ([Homebrew](https://brew.sh/) 필요) |
-| **macOS (Homebrew 없음)** | [python.org/downloads](https://www.python.org/downloads/)에서 다운로드 |
-| **Windows** | [python.org/downloads](https://www.python.org/downloads/)에서 다운로드. 설치 시 "Add Python to PATH" 체크. |
-| **Linux (Debian/Ubuntu)** | `sudo apt install python3 python3-pip` |
+| **macOS** | `brew install uv` |
+| **Windows** | `powershell -c "irm https://astral.sh/uv/install.ps1 \| iex"` |
+| **Linux** | `curl -LsSf https://astral.sh/uv/install.sh \| sh` |
 
-#### 2. bht-mcp 설치
+설치 후 아래 [MCP 클라이언트 설정](#mcp-클라이언트-설정)으로 바로 진행하세요.
+
+#### 방법 B: pip 사용
+
+전통적인 방식을 선호하는 경우:
 
 ```bash
 pip install bht-mcp
 ```
 
-설치 확인:
-
-```bash
-bht-mcp --help
-```
-
-`pip`이 인식되지 않으면 `pip3`를 사용하세요.
+> **Python 3.11 이상 필요.** Python이 없는 경우: [python.org/downloads](https://www.python.org/downloads/) (Windows: "Add Python to PATH" 체크). macOS: `brew install python`. Linux: `sudo apt install python3 python3-pip`.
 
 ---
 
 ### MCP 클라이언트 설정
 
-MCP (Model Context Protocol)는 AI 어시스턴트가 외부 도구를 사용할 수 있게 해줍니다. AI 클라이언트에 bht-mcp를 등록해야 합니다. 아래에서 사용 중인 클라이언트를 선택하세요:
+MCP (Model Context Protocol)는 AI 어시스턴트가 외부 도구를 사용할 수 있게 해줍니다. 아래에서 사용 중인 클라이언트를 선택하세요:
 
 #### Claude Desktop
 
 MCP 설정을 편집합니다 (Settings → Developer → MCP Servers):
 
+**uv로 설치한 경우:**
 ```json
 {
   "mcpServers": {
     "bht": {
-      "command": "bht-mcp"
+      "command": "uvx",
+      "args": ["bht-mcp"]
+    }
+  }
+}
+```
+
+**pip으로 설치한 경우:**
+```json
+{
+  "mcpServers": {
+    "bht": {
+      "command": "python",
+      "args": ["-m", "bht_mcp"]
     }
   }
 }
@@ -412,29 +432,39 @@ MCP 설정을 편집합니다 (Settings → Developer → MCP Servers):
 
 #### Claude Code
 
-터미널에서 실행:
-
 ```bash
-claude mcp add bht -- bht-mcp
+claude mcp add bht -- uvx bht-mcp
 ```
 
-또는 `~/.claude/claude_desktop_config.json`에 위의 JSON을 직접 추가할 수도 있습니다.
+pip 사용 시:
+
+```bash
+claude mcp add bht -- python -m bht_mcp
+```
 
 #### 로컬 LLM (Open WebUI, llama.cpp, Ollama 등)
 
-로컬 LLM 환경이 MCP를 지원하는 경우, `bht-mcp`를 stdio 서브프로세스로 실행하도록 설정하세요. 서버 명령어:
+로컬 LLM 환경이 MCP를 지원하는 경우, bht-mcp를 stdio 서브프로세스로 설정하세요:
 
-```bash
-bht-mcp
-```
-
-MCP 서버 설정을 받는 프레임워크의 경우:
-
+**uv 사용:**
 ```json
 {
   "mcpServers": {
     "bht": {
-      "command": "bht-mcp"
+      "command": "uvx",
+      "args": ["bht-mcp"]
+    }
+  }
+}
+```
+
+**pip 사용:**
+```json
+{
+  "mcpServers": {
+    "bht": {
+      "command": "python",
+      "args": ["-m", "bht_mcp"]
     }
   }
 }
@@ -444,7 +474,7 @@ MCP 서버 설정을 받는 프레임워크의 경우:
 
 #### 기타 MCP 호환 클라이언트
 
-MCP stdio 전송을 지원하는 모든 클라이언트에서 사용할 수 있습니다. 서버 명령어는 `bht-mcp`입니다.
+MCP stdio 전송을 지원하는 모든 클라이언트에서 사용할 수 있습니다. 서버 명령어는 `uvx bht-mcp` 또는 `python -m bht_mcp`입니다.
 
 추가 후 클라이언트를 재시작하면 7개의 BHt 도구가 활성화됩니다.
 
