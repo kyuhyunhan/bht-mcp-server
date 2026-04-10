@@ -14,11 +14,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import aiosqlite
+
+logger = logging.getLogger("bht-mcp.cache")
 
 from bht_mcp.models import DAILY_HTML_LIMIT, Quota
 
@@ -254,6 +257,7 @@ class CacheManager:
         await self._db.commit()
         # Clean up old request history (>30 days)
         await self._cleanup_history()
+        logger.info("Cache initialized at %s", self._db_path)
 
     async def close(self) -> None:
         if self._db:

@@ -14,10 +14,13 @@ are handled by the tool layer.
 from __future__ import annotations
 
 import asyncio
+import logging
 import time
 from typing import Any
 
 import httpx
+
+logger = logging.getLogger("bht-mcp.fetcher")
 
 from bht_mcp.cache import CacheManager
 from bht_mcp.models import (
@@ -236,6 +239,7 @@ class Fetcher:
     async def _check_daily_limit(self) -> None:
         """Raise DailyLimitExceeded if daily HTML quota is exhausted."""
         if not await self._cache.can_make_html_request():
+            logger.warning("Daily HTML request limit reached")
             raise DailyLimitExceeded()
 
     async def _post(
@@ -269,11 +273,13 @@ class Fetcher:
         """Core request method with rate limiting, single retry, and logging."""
         await self._rate_limit_wait()
 
+        logger.debug("%s %s [%s]", method, endpoint, log_params)
         start_ms = _now_ms()
         try:
             response = await self._do_request(method, url, data)
         except httpx.TimeoutException:
             # Single retry after delay for timeouts only
+            logger.warning("Timeout on %s %s — retrying in %.0fs", method, endpoint, _RETRY_DELAY)
             await self._cache.log_request(
                 endpoint=endpoint, url=url, params=log_params,
                 status=None, response_ms=_now_ms() - start_ms,
@@ -285,6 +291,7 @@ class Fetcher:
             try:
                 response = await self._do_request(method, url, data)
             except httpx.TimeoutException:
+                logger.error("Timeout on %s %s — retry also failed", method, endpoint)
                 await self._cache.log_request(
                     endpoint=endpoint, url=url, params=log_params,
                     status=None, response_ms=_now_ms() - start_ms,
@@ -299,6 +306,7 @@ class Fetcher:
 
         # Check for server errors
         if response.status_code >= 500:
+            logger.error("BHt server error %d on %s %s", response.status_code, method, endpoint)
             await self._cache.log_request(
                 endpoint=endpoint, url=url, params=log_params,
                 status=response.status_code, response_ms=elapsed_ms,
@@ -309,6 +317,7 @@ class Fetcher:
             )
 
         if response.status_code == 404:
+            logger.warning("404 on %s %s", method, endpoint)
             await self._cache.log_request(
                 endpoint=endpoint, url=url, params=log_params,
                 status=404, response_ms=elapsed_ms,
@@ -319,6 +328,7 @@ class Fetcher:
             )
 
         # Success — log and increment counter for HTML endpoints
+        logger.info("%s %s → %d (%dms)", method, endpoint, response.status_code, elapsed_ms)
         await self._cache.log_request(
             endpoint=endpoint, url=url, params=log_params,
             status=response.status_code, response_ms=elapsed_ms,

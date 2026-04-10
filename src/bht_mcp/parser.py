@@ -12,11 +12,14 @@ All parse functions return dicts matching beleg_cache column names.
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 from bs4 import BeautifulSoup, NavigableString, Tag
+
+logger = logging.getLogger("bht-mcp.parser")
 
 
 # ---------------------------------------------------------------------------
@@ -32,6 +35,7 @@ def parse_beleg(html: str) -> dict[str, Any]:
     soup = BeautifulSoup(html, "html.parser")
     table = soup.find("table", attrs={"border": "0"})
     if table is None:
+        logger.error("No beleg data table found in HTML (%d bytes)", len(html))
         raise ValueError("No beleg data table found (expected <table border='0'>)")
 
     # Build label → value-cell mapping (label-based, not index-based)
@@ -106,6 +110,7 @@ def _parse_stellenangabe(cells: dict[str, Tag], out: dict[str, Any]) -> None:
         out["frag"] = int(m.group(5))
         out["pos"] = int(m.group(6))
     else:
+        logger.error("Cannot parse Stellenangabe: %r", text)
         raise ValueError(f"Cannot parse Stellenangabe: {text!r}")
 
 

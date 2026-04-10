@@ -9,10 +9,21 @@ All 7 tools registered.
 from __future__ import annotations
 
 import json
+import logging
+import sys
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+
+# MCP stdio servers must never write to stdout. Configure logging to stderr.
+logging.basicConfig(
+    level=logging.INFO,
+    stream=sys.stderr,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
+)
+logger = logging.getLogger("bht-mcp")
 
 from mcp.server.fastmcp import Context, FastMCP
 
@@ -48,15 +59,18 @@ class AppState:
 @asynccontextmanager
 async def lifespan(server: FastMCP):
     """Initialize cache and HTTP client; clean up on shutdown."""
+    logger.info("Starting bht-mcp server (cache: %s)", _DEFAULT_CACHE_DIR)
     cache = CacheManager(_DEFAULT_CACHE_DIR)
     await cache.initialize()
     fetcher = Fetcher(cache)
     await fetcher.initialize()
+    logger.info("Server ready — 7 tools available")
     try:
         yield AppState(cache=cache, fetcher=fetcher)
     finally:
         await fetcher.close()
         await cache.close()
+        logger.info("Server shut down")
 
 
 def _get_state(ctx: Context) -> AppState:
