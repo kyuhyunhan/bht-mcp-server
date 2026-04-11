@@ -23,6 +23,8 @@ from bht_mcp.models import (
     BookInfo,
     ErrorCode,
     ErrorInfo,
+    decode_betacode,
+    normalize_for_comparison,
     ToolResponse,
     validate_book,
     validate_field,
@@ -35,6 +37,15 @@ _POST_FILTER_FIELDS = frozenset({"kapitel", "vers"})
 # buch is a search field but also triggers the tokens-table path
 # when it's the ONLY search field present.
 _LOCATION_FIELDS = frozenset({"buch", "kapitel", "vers"})
+
+# Fields whose API values are betacode-encoded. When a transcription value
+# (e.g. "BRʾ") yields empty results, we try fuzzy matching against
+# autocomplete values decoded from betacode.
+_BETACODE_FIELDS = frozenset({
+    "Wurzel", "lexem", "basis", "basis2", "bashom", "basel",
+    "basvar", "basab", "endg", "erw", "bautyp", "bauvariante",
+    "bauab", "alt", "stueck", "komb",
+})
 
 
 # ---------------------------------------------------------------------------
@@ -287,6 +298,23 @@ async def _search_via_flex_search(
             query_hash, query_desc, json.dumps(rows), len(rows)
         )
 
+    # If empty results and betacode fields present, try fuzzy matching
+    if not rows:
+        resolved = await _resolve_betacode_values(cache, fetcher, api_filters)
+        if resolved is not None:
+            # Retry with betacode-corrected filters
+            query_hash, query_desc = CacheManager.compute_query_hash(resolved)
+            cached = await cache.get_search_cache(query_hash)
+            if cached is not None:
+                result_json, _ = cached
+                rows = json.loads(result_json)
+            else:
+                raw = await fetcher.flex_search(resolved)
+                rows = [_normalize_api_row(r) for r in raw]
+                await cache.set_search_cache(
+                    query_hash, query_desc, json.dumps(rows), len(rows)
+                )
+
     # Apply post-filters (kapitel, vers)
     if post_filters:
         rows = _apply_post_filters(rows, post_filters)
@@ -297,6 +325,69 @@ async def _search_via_flex_search(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+async def _resolve_betacode_values(
+    cache: CacheManager,
+    fetcher: Fetcher,
+    api_filters: list[dict[str, str]],
+) -> list[dict[str, str]] | None:
+    """Try to resolve transcription values to betacode for text fields.
+
+    Returns corrected filter list, or None if no betacode field or no match found.
+    """
+    betacode_filters = [f for f in api_filters if f["field"] in _BETACODE_FIELDS]
+    if not betacode_filters:
+        return None
+
+    resolved = list(api_filters)  # shallow copy
+    any_resolved = False
+
+    for f in resolved:
+        if f["field"] not in _BETACODE_FIELDS:
+            continue
+        # Already betacode (starts with % or $)? Skip.
+        if f["value"].startswith(("%", "$")):
+            continue
+
+        # Get autocomplete values for this field
+        values = await cache.get_field_values(f["field"])
+        if values is None:
+            try:
+                values = await fetcher.autocomplete(f["field"])
+                if values:
+                    await cache.set_field_values(f["field"], values)
+            except Exception:
+                continue
+
+        if not values:
+            continue
+
+        # Decode each betacode value and compare normalized forms
+        input_norm = normalize_for_comparison(f["value"])
+        if not input_norm:
+            continue
+
+        matches: list[str] = []
+        for beta_val in values:
+            decoded = decode_betacode(beta_val)
+            decoded_norm = normalize_for_comparison(decoded)
+            if decoded_norm == input_norm:
+                matches.append(beta_val)
+
+        if len(matches) == 1:
+            f["value"] = matches[0]
+            any_resolved = True
+        elif len(matches) > 1:
+            # Ambiguous — try exact case match
+            for beta_val in matches:
+                decoded = decode_betacode(beta_val)
+                if decoded == f["value"]:
+                    f["value"] = beta_val
+                    any_resolved = True
+                    break
+
+    return resolved if any_resolved else None
 
 
 def _normalize_api_row(raw: dict[str, Any]) -> dict[str, Any]:

@@ -566,6 +566,70 @@ def validate_field(name: str) -> FieldInfo:
     )
 
 
+# ---------------------------------------------------------------------------
+# Betacode decoding — BHt uses betacode internally for text fields
+# ---------------------------------------------------------------------------
+
+# Betacode sequence → transcription character (observed from beleg HTML)
+BETACODE_MAP: dict[str, str] = {
+    # Uppercase consonants
+    "%B": "B", "%G": "G", "%D": "D", "%H": "H", "%W": "W",
+    "%Z": "Z", "%K": "K", "%L": "L", "%M": "M", "%N": "N",
+    "%S": "S", "%P": "P", "%Q": "Q", "%R": "R", "%T": "T",
+    "%Y": "Y",
+    # Lowercase consonants + vowels
+    "%a": "a", "%b": "b", "%g": "g", "%d": "d", "%e": "e",
+    "%h": "h", "%i": "i", "%o": "o", "%u": "u", "%w": "w",
+    "%z": "z", "%k": "k", "%l": "l", "%m": "m", "%n": "n",
+    "%s": "s", "%p": "p", "%q": "q", "%r": "r", "%t": "t",
+    "%y": "y",
+    # Special characters
+    "%@": "ʾ",  # aleph
+    "%-": "-",
+    "%(": "(",
+    "%)": ")",
+    "%[": "[",
+    "%]": "]",
+    "%.": "˙",
+    "%*": "*",
+    # Vowels with diacritics ($ prefix)
+    "$a": "ā", "$i": "ī", "$o": "ō", "$e": "ē", "$u": "ū",
+    "$A": "Ā", "$I": "Ī", "$O": "Ō", "$E": "Ē", "$U": "Ū",
+    # Emphatic/special consonants ($ prefix)
+    "$C": "Ṯ", "$D": "Ḏ", "$G": "Ġ", "$H": "Ḥ", "$K": "Ḫ",
+    "$L": "Ḷ", "$M": "Ṯ", "$R": "Ṛ", "$S": "Ṣ", "$T": "Ṭ",
+    "$U": "Ū", "$V": "Ḍ", "$Z": "Ẓ",
+}
+
+
+def decode_betacode(beta: str) -> str:
+    """Decode a BHt betacode string to transcription.
+
+    Example: '%B%R%@' → 'BRʾ', '%@%M%R' → 'ʾMR'
+    Non-betacode characters (spaces, digits, '+') pass through unchanged.
+    """
+    result: list[str] = []
+    i = 0
+    while i < len(beta):
+        if i + 1 < len(beta) and beta[i] in ("%", "$"):
+            seq = beta[i : i + 2]
+            if seq in BETACODE_MAP:
+                result.append(BETACODE_MAP[seq])
+                i += 2
+                continue
+        result.append(beta[i])
+        i += 1
+    return "".join(result)
+
+
+def normalize_for_comparison(text: str) -> str:
+    """Strip non-ASCII characters and lowercase for fuzzy betacode matching.
+
+    'BRʾ' → 'br', 'ʾMR' → 'mr', '%B%R%@' → '%b%r%@'
+    """
+    return "".join(c.lower() for c in text if ord(c) < 128)
+
+
 def is_valid_chapter(book: BookInfo, chapter: int) -> bool:
     """Check if a chapter number is valid for the given book."""
     if book.chapter_list is not None:
