@@ -632,6 +632,30 @@ def decode_betacode(beta: str) -> str:
     return "".join(result)
 
 
+# Reverse mapping: transcription character → betacode sequence.
+# Built from BETACODE_MAP. For ambiguous cases (e.g. $a="ā" and $a="ā"),
+# longer/more-specific transcription chars are tried first.
+_REVERSE_BETACODE: dict[str, str] = {}
+for _seq, _char in sorted(BETACODE_MAP.items(), key=lambda x: -len(x[1])):
+    if _char not in _REVERSE_BETACODE:
+        _REVERSE_BETACODE[_char] = _seq
+
+
+def encode_betacode(text: str) -> str:
+    """Encode a transcription string to BHt betacode.
+
+    Example: 'BRʾ' → '%B%R%@', 'ŠMR' → '$S%M%R'
+    Characters not in the mapping pass through unchanged.
+    """
+    result: list[str] = []
+    for ch in text:
+        if ch in _REVERSE_BETACODE:
+            result.append(_REVERSE_BETACODE[ch])
+        else:
+            result.append(ch)
+    return "".join(result)
+
+
 def normalize_for_comparison(text: str) -> str:
     """Strip non-ASCII characters and lowercase for fuzzy betacode matching.
 

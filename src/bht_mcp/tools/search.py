@@ -24,6 +24,7 @@ from bht_mcp.models import (
     ErrorCode,
     ErrorInfo,
     decode_betacode,
+    encode_betacode,
     normalize_for_comparison,
     ToolResponse,
     validate_book,
@@ -123,10 +124,14 @@ async def bht_field_info(
             quota=quota,
         )
 
-    # Autocomplete field with prefix → fetch with prefix (not cached globally)
+    # Autocomplete field with prefix → convert to betacode if needed, then fetch
     if prefix and field in _AUTOCOMPLETE_FIELDS:
+        # If prefix is not already betacode, encode it
+        api_prefix = prefix
+        if not prefix.startswith(("%", "$")):
+            api_prefix = encode_betacode(prefix)
         try:
-            values = await fetcher.autocomplete(field, value=prefix)
+            values = await fetcher.autocomplete(field, value=api_prefix)
         except BhtUnavailable as e:
             return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
         return ToolResponse(
