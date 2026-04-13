@@ -77,13 +77,22 @@ def _book_to_dict(b: BookInfo) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+# Fields that require prefix for autocomplete (large value sets).
+# Determined from BHt web UI /flex_search/suche/ — these are text+autocomplete
+# inputs, not dropdown selects.
+_AUTOCOMPLETE_FIELDS = frozenset({
+    "Wurzel", "lexem", "basis", "basis2", "basvar", "basab",
+    "sprache", "stueck", "bautyp", "bauvariante", "bauab",
+})
+
+
 async def bht_field_info(
-    cache: CacheManager, fetcher: Fetcher, field: str
+    cache: CacheManager, fetcher: Fetcher, field: str, prefix: str | None = None
 ) -> ToolResponse:
     """Get valid values for a BHt search field.
 
-    Source: field_values_cache → autocomplete API on cache miss.
-    BHt requests: 0 (cached) or 1 (cache miss).
+    For autocomplete fields (Wurzel, lexem, basis, etc.), a prefix is required
+    to narrow results. Dropdown fields return all values without prefix.
     """
     quota = await cache.get_quota()
 
@@ -101,7 +110,36 @@ async def bht_field_info(
             ),
         )
 
-    # Check cache
+    # Gateway: autocomplete fields require prefix
+    if field in _AUTOCOMPLETE_FIELDS and not prefix:
+        return ToolResponse(
+            data={
+                "field": field,
+                "description": info.description,
+                "type": "autocomplete",
+                "message": f"'{field}' has thousands of values. Provide a prefix to narrow results.",
+                "example": f"bht_field_info(field='{field}', prefix='BR')",
+            },
+            quota=quota,
+        )
+
+    # Autocomplete field with prefix → fetch with prefix (not cached globally)
+    if prefix and field in _AUTOCOMPLETE_FIELDS:
+        try:
+            values = await fetcher.autocomplete(field, value=prefix)
+        except BhtUnavailable as e:
+            return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
+        return ToolResponse(
+            data={
+                "field": field,
+                "description": info.description,
+                "prefix": prefix,
+                "values": _decode_values(field, values),
+            },
+            quota=await cache.get_quota(),
+        )
+
+    # Dropdown field → full list (check cache first)
     values = await cache.get_field_values(field)
     if values is not None:
         return ToolResponse(
@@ -115,7 +153,6 @@ async def bht_field_info(
     except BhtUnavailable as e:
         return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
 
-    # Cache and return
     if values:
         await cache.set_field_values(field, values)
 
@@ -124,6 +161,13 @@ async def bht_field_info(
         data={"field": field, "description": info.description, "values": values},
         quota=quota,
     )
+
+
+def _decode_values(field: str, values: list[str]) -> list[dict[str, str]]:
+    """Decode betacode values to include transcription labels."""
+    if field in _BETACODE_FIELDS:
+        return [{"value": v, "label": decode_betacode(v)} for v in values]
+    return [{"value": v} for v in values]
 
 
 # ---------------------------------------------------------------------------

@@ -570,35 +570,45 @@ def validate_field(name: str) -> FieldInfo:
 # Betacode decoding — BHt uses betacode internally for text fields
 # ---------------------------------------------------------------------------
 
-# Betacode sequence → transcription character (observed from beleg HTML)
+# Betacode sequence → transcription character.
+# Source: BHt official code tables at /db_views/zeichenkodierungtra/,
+# /db_views/zeichenkodierungsem/, /db_views/zeichenkodierungson/.
 BETACODE_MAP: dict[str, str] = {
-    # Uppercase consonants
-    "%B": "B", "%G": "G", "%D": "D", "%H": "H", "%W": "W",
-    "%Z": "Z", "%K": "K", "%L": "L", "%M": "M", "%N": "N",
-    "%S": "S", "%P": "P", "%Q": "Q", "%R": "R", "%T": "T",
-    "%Y": "Y",
-    # Lowercase consonants + vowels
-    "%a": "a", "%b": "b", "%g": "g", "%d": "d", "%e": "e",
-    "%h": "h", "%i": "i", "%o": "o", "%u": "u", "%w": "w",
-    "%z": "z", "%k": "k", "%l": "l", "%m": "m", "%n": "n",
-    "%s": "s", "%p": "p", "%q": "q", "%r": "r", "%t": "t",
-    "%y": "y",
-    # Special characters
+    # --- zeichenkodierungtra: Hebrew/Aramaic base ---
+    # Consonants (lowercase)
     "%@": "ʾ",  # aleph
-    "%-": "-",
-    "%(": "(",
-    "%)": ")",
-    "%[": "[",
-    "%]": "]",
-    "%.": "˙",
-    "%*": "*",
-    # Vowels with diacritics ($ prefix)
-    "$a": "ā", "$i": "ī", "$o": "ō", "$e": "ē", "$u": "ū",
-    "$A": "Ā", "$I": "Ī", "$O": "Ō", "$E": "Ē", "$U": "Ū",
-    # Emphatic/special consonants ($ prefix)
-    "$C": "Ṯ", "$D": "Ḏ", "$G": "Ġ", "$H": "Ḥ", "$K": "Ḫ",
-    "$L": "Ḷ", "$M": "Ṯ", "$R": "Ṛ", "$S": "Ṣ", "$T": "Ṭ",
-    "$U": "Ū", "$V": "Ḍ", "$Z": "Ẓ",
+    "%b": "b", "%g": "g", "%d": "d", "%h": "h", "%w": "w",
+    "%z": "z", "%y": "y", "%k": "k", "%l": "l", "%m": "m",
+    "%n": "n", "%s": "s", "%p": "p", "%q": "q", "%r": "r", "%t": "t",
+    # Consonants (uppercase)
+    "%B": "B", "%G": "G", "%D": "D", "%H": "H", "%W": "W",
+    "%Z": "Z", "%Y": "Y", "%K": "K", "%L": "L", "%M": "M",
+    "%N": "N", "%S": "S", "%P": "P", "%Q": "Q", "%R": "R", "%T": "T",
+    # Vowels (short, %-prefix)
+    "%a": "a", "%i": "i", "%u": "u", "%e": "e", "%o": "o",
+    # Special consonants ($-prefix, from zeichenkodierungtra)
+    "$c": "ʿ", "$C": "ʿ",   # ayin
+    "$h": "ḥ", "$H": "Ḥ",   # chet
+    "$t": "ṭ", "$T": "Ṭ",   # tet
+    "$v": "ṣ", "$V": "Ṣ",   # tsade
+    "$r": "ś", "$R": "Ś",   # sin
+    "$s": "š", "$S": "Š",   # shin
+    # Vowels (long, $-prefix)
+    "$a": "ā", "$e": "ē", "$i": "ī", "$o": "ō", "$u": "ū",
+    # Vowels (paradigmatically reconstructed, $+uppercase)
+    "$A": "ȧ", "$I": "ï", "$U": "u̇", "$E": "ǟ", "$O": "ō",
+    # --- zeichenkodierungsem: Semitic additional ---
+    "$K": "Ḫ", "$k": "ḫ",   # velar fricative
+    "$L": "Ḍ", "$l": "ḍ",   # emphatic d
+    "$Z": "Ẓ", "$z": "ẓ",   # emphatic z
+    "$M": "Ṯ", "$m": "ṯ",   # interdental t
+    "$D": "Ḏ", "$d": "ḏ",   # interdental d
+    "$G": "Ġ", "$g": "ġ",   # voiced velar fricative
+    "$J": "Ǧ", "$j": "ǧ",   # palatalized g
+    # --- Structural marks ---
+    "%-": "-", "%(": "(", "%)": ")", "%[": "[", "%]": "]",
+    "%.": "˙", "%*": "*", "%=": "=",
+    "$+": "⁺",
 }
 
 

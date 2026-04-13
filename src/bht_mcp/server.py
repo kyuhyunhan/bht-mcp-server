@@ -138,24 +138,25 @@ async def list_books(ctx: Context) -> str:
     name="bht_field_info",
     description=(
         "Get valid values for a BHt search field. Use this to discover "
-        "what filter values are available before searching. Common fields:\n"
-        "- wa: part of speech (e.g. '11 VERB', '12 SUBSTANTIV', '31 PRAEPOSITION')\n"
+        "what filter values are available before searching.\n\n"
+        "Dropdown fields (wa, stamm, ps, gen, num, etc.) return all values.\n"
+        "Autocomplete fields (Wurzel, lexem, basis, etc.) require a prefix "
+        "to narrow results — call with prefix parameter.\n\n"
+        "Common fields:\n"
+        "- wa: part of speech (e.g. '11 VERB', '12 SUBSTANTIV')\n"
         "- stamm: verbal stem ('G'=Qal, 'D'=Piel, 'H'=Hiphil, 'N'=Niphal)\n"
-        "- ps: person ('1','2','3','0'=n/a)\n"
-        "- gen: gender ('M','F','0'=n/a)\n"
-        "- num: number ('S'=singular,'P'=plural,'D'=dual,'0'=n/a)\n"
-        "- Wurzel: root (e.g. 'BRʾ', 'ʾMR', 'HLK')\n"
-        "- lexem: lexeme"
+        "- Wurzel: root — use prefix, e.g. prefix='BR'"
     ),
 )
-async def field_info(field: str, ctx: Context) -> str:
+async def field_info(field: str, ctx: Context, prefix: str | None = None) -> str:
     """Get valid values for a search field.
 
     Args:
         field: One of the 42 search field names (e.g. 'wa', 'stamm', 'Wurzel').
+        prefix: For autocomplete fields, narrow results by prefix (e.g. 'BR' for roots starting with BR).
     """
     state = _get_state(ctx)
-    resp = await _bht_field_info(state.cache, state.fetcher, field)
+    resp = await _bht_field_info(state.cache, state.fetcher, field, prefix)
     return json.dumps(resp.to_dict(), ensure_ascii=False)
 
 
