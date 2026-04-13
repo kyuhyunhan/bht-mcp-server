@@ -81,6 +81,8 @@ def _book_to_dict(b: BookInfo) -> dict[str, Any]:
 # Fields that require prefix for autocomplete (large value sets).
 # Determined from BHt web UI /flex_search/suche/ — these are text+autocomplete
 # inputs, not dropdown selects.
+_FIELD_VALUE_LIMIT = 200  # Max values returned per field_info call
+
 _AUTOCOMPLETE_FIELDS = frozenset({
     "Wurzel", "lexem", "basis", "basis2", "basvar", "basab",
     "sprache", "stueck", "bautyp", "bauvariante", "bauab",
@@ -134,15 +136,21 @@ async def bht_field_info(
             values = await fetcher.autocomplete(field, value=api_prefix)
         except BhtUnavailable as e:
             return ToolResponse(data=None, quota=await cache.get_quota(), error=e.error_info)
-        return ToolResponse(
-            data={
-                "field": field,
-                "description": info.description,
-                "prefix": prefix,
-                "values": _decode_values(field, values),
-            },
-            quota=await cache.get_quota(),
-        )
+        total = len(values)
+        truncated = total > _FIELD_VALUE_LIMIT
+        if truncated:
+            values = values[:_FIELD_VALUE_LIMIT]
+        data: dict[str, Any] = {
+            "field": field,
+            "description": info.description,
+            "prefix": prefix,
+            "values": _decode_values(field, values),
+        }
+        if truncated:
+            data["truncated"] = True
+            data["total"] = total
+            data["suggestion"] = f"Too many results ({total}). Use a longer prefix to narrow."
+        return ToolResponse(data=data, quota=await cache.get_quota())
 
     # Dropdown field → full list (check cache first)
     values = await cache.get_field_values(field)
